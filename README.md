@@ -217,7 +217,3 @@ ln -s "$(pwd)/agent-task-spec" ~/.codex/skills/agent-task-spec
 - 不只等交付：提前定义什么叫完成。
 - 不相信假完成：要求证据、测试、引用、截图或人工验收标准。
 - 不堆模板：小任务用精简版，大任务才展开完整 spec。
-
-## 来源
-
-这个 skill 的方法骨架来自微信文章《[AI 时代，如何把需求跟 Agent 说清楚](https://mp.weixin.qq.com/s/Dalr8RanlWOEvhpxUjmeTA)》，并被改写成适合 Codex skill 使用的可执行流程。
