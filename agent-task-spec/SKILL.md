@@ -6,9 +6,10 @@ description: >
   Claude Code, ChatGPT agents, subagents, or another AI worker; asks to write,
   expand, refine, audit, or rewrite an agent prompt/spec/task brief/handoff;
   says "帮我把需求跟 agent 说清楚", "派任务", "扩写需求", "优化 prompt", "审查这段需求",
-  "写成 spec"; or gives a broad request that needs clearer goals, context,
-  boundaries, output format, false-completion warnings, and verification before
-  an agent should act.
+  "写成 spec", "托管执行", "接管", "直接帮我操作", "派子智能体", or "主 Agent";
+  or gives a broad request that needs clearer goals, context, boundaries, output
+  format, false-completion warnings, verification, delegation policy, and safe
+  execution boundaries before an agent should act.
 ---
 
 # Agent Task Spec
@@ -22,6 +23,7 @@ Pick the lightest mode that fits the user request.
 - **Expand mode**: Use when the user gives a rough one-liner or vague idea. Produce a complete, copy-ready task spec. Make reasonable assumptions and label them.
 - **Interview mode**: Use when missing information would change the direction, risk, or deliverable. Ask 1-3 high-leverage questions before writing the final spec.
 - **Review mode**: Use when the user provides an existing prompt, task brief, PRD, or handoff. Diagnose gaps first, then provide a revised version.
+- **Managed Execution mode**: Use when the user wants an agent to take over more work, operate tools, run commands, edit files, research, validate, or coordinate subagents after the task is clarified. Produce a task spec plus an execution contract the current or next agent can follow directly.
 
 When unsure, default to Expand mode with a short "Assumptions" section. Do not ask questions just to fill every template field.
 
@@ -51,6 +53,32 @@ When unsure, default to Expand mode with a short "Assumptions" section. Do not a
 5. Produce the final brief in the user's language unless they ask otherwise.
    - If the user wants to hand it to another agent, output a copy-ready prompt.
    - If the user wants this agent to execute the work now, use the brief as the working spec and then act.
+   - If using Managed Execution mode, make the autonomy level, risky-action pause rules, delegation policy, verification evidence, and stop conditions explicit before acting.
+
+## Managed Execution Mode
+
+Use this mode for broad tasks where the user wants the agent to do more than write advice. The goal is controlled autonomy: the agent should keep moving, but not cross risky boundaries silently.
+
+Default operating contract:
+
+- First convert the user's request into a concrete outcome, constraints, write boundaries, and verification checks.
+- Act directly when the action is low risk: read files, inspect docs, search public sources, run local commands, edit scoped files, start local dev servers, create local artifacts, and rerun checks.
+- Ask first before account creation, paid services, production changes, deleting user data, irreversible operations, credentials, private data export, legal/medical/financial decisions, or broad repo/system rewrites.
+- Prefer doing the immediate blocking work locally. Delegate only sidecar work that can run independently while the main agent continues useful progress.
+- Use subagents only when the task naturally splits into independent domains. Assign each subagent a concrete scope, expected output, and disjoint write ownership. Do not spawn subagents merely to appear thorough.
+- The main agent owns final judgment: review subagent output, integrate or reject it, run verification, and report what is proven, uncertain, or still blocked.
+- After failures, inspect logs or evidence before retrying. Make at most 3 focused repair rounds unless new evidence justifies continuing.
+
+Managed Execution output should include:
+
+```markdown
+## Execution Contract
+Autonomy level: what the agent may do without asking.
+Delegation policy: when to use subagents, how to split ownership, and when not to delegate.
+Pause rules: actions that require user confirmation.
+Verification evidence: commands, screenshots, citations, diffs, or manual checks required before completion.
+Completion rule: what must be proven before the agent can say it is done.
+```
 
 ## Scenario Presets
 
@@ -130,7 +158,7 @@ Use this structure by default. Omit sections only when they are truly irrelevant
 # Agent Task Spec
 
 ## Mode
-Expand / Interview / Review
+Expand / Interview / Review / Managed Execution
 
 ## Background
 Why this work matters now, what has already happened, and what the agent should know before acting.
@@ -155,6 +183,12 @@ The concrete outcome to produce, including whose problem it solves and what stat
 ## Available Tools And Actions
 - What the agent may read, search, run, edit, create, or call
 - Any preferred local commands, APIs, frameworks, or workflows
+
+## Execution Contract
+- Autonomy level:
+- Delegation policy:
+- Pause rules:
+- Retry policy:
 
 ## Boundaries
 - Can do:
@@ -185,6 +219,7 @@ Assumptions:
 Must include:
 Must avoid:
 Allowed actions:
+Delegation:
 Ask first before:
 Done means:
 Not done if:
@@ -260,6 +295,24 @@ False completion: A large comparison table without synthesis, confidence levels,
 Verification: Every factual claim that could change the conclusion needs a source and access date.
 ```
 
+### Example 4: Managed Execution
+
+Input:
+```text
+以后这种任务你直接接管，能拆就拆，能操作就操作，不要每步都问我。
+```
+
+Better task direction:
+```markdown
+Mode: Managed Execution
+Goal: Complete the requested outcome end to end, not merely propose a plan.
+Allowed actions: Inspect relevant files and docs, run local commands, edit scoped files, start local services, search public sources, and verify results with concrete evidence.
+Delegation policy: Split into subagents only when there are independent modules or research questions. Give each subagent a narrow scope and disjoint write ownership. The main agent keeps the critical path, reviews outputs, and performs final verification.
+Ask first before: Credentials, paid services, production data, destructive operations, public publishing, privacy-sensitive data, or broad unrelated rewrites.
+False completion: A plan, partial implementation, unreviewed subagent output, or unverified "looks done" summary does not count.
+Verification: Report changed files, command outputs, runtime checks, source links, screenshots, or acceptance checks that prove the result.
+```
+
 ## Quality Check
 
 Before handing off the spec, confirm:
@@ -267,6 +320,8 @@ Before handing off the spec, confirm:
 - A capable agent would know why the task matters, not only what to produce.
 - The spec says what matters more than what is merely nice to have.
 - Scope boundaries are explicit enough to prevent unwanted edits, claims, or tool use.
+- The autonomy level is explicit enough that the agent can keep moving without asking about every safe action.
+- Delegation is justified by independent work, not by a desire to use more agents.
 - Completion cannot be faked by a polished but shallow answer.
 - Verification is independent enough that the user is not relying only on the agent's self-assessment.
 - The final brief is short enough to use and specific enough to constrain action.
