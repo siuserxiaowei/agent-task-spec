@@ -6,7 +6,8 @@ description: >
   Claude Code, ChatGPT agents, subagents, or another AI worker; asks to write,
   expand, refine, audit, or rewrite an agent prompt/spec/task brief/handoff;
   says "帮我把需求跟 agent 说清楚", "派任务", "扩写需求", "优化 prompt", "审查这段需求",
-  "写成 spec", "托管执行", "接管", "直接帮我操作", "派子智能体", or "主 Agent";
+  "写成 spec", "托管执行", "接管", "直接帮我操作", "派子智能体", "主 Agent",
+  "自主执行等级", or "autonomy level";
   or gives a broad request that needs clearer goals, context, boundaries, output
   format, false-completion warnings, verification, delegation policy, and safe
   execution boundaries before an agent should act.
@@ -52,7 +53,7 @@ When unsure, default to Expand mode with a short "Assumptions" section. Do not a
 
 5. Produce the final brief in the user's language unless they ask otherwise.
    - If the user wants to hand it to another agent, output a copy-ready prompt.
-   - If the user wants this agent to execute the work now, use the brief as the working spec and then act.
+   - If the user wants this agent to execute the work now, do not stop after producing the spec. Use the brief as the working contract and begin execution immediately unless a pause rule is triggered.
    - If using Managed Execution mode, make the autonomy level, risky-action pause rules, delegation policy, verification evidence, and stop conditions explicit before acting.
 
 ## Managed Execution Mode
@@ -69,11 +70,37 @@ Default operating contract:
 - The main agent owns final judgment: review subagent output, integrate or reject it, run verification, and report what is proven, uncertain, or still blocked.
 - After failures, inspect logs or evidence before retrying. Make at most 3 focused repair rounds unless new evidence justifies continuing.
 
+Autonomy levels:
+
+- **L1 Spec only**: Clarify the request and produce a task spec. Do not execute.
+- **L2 Read and research**: Read local files, inspect docs, search public sources, and propose the execution plan. Do not edit files.
+- **L3 Local execution**: Run local commands, edit scoped local files, create local artifacts, and verify results.
+- **L4 Delegated execution**: Do L3 work and coordinate subagents for independent sidecar tasks with disjoint write scopes.
+- **L5 Pause required**: Stop and ask before credentials, accounts, payments, production systems, destructive actions, public publishing, private data export, legal/medical/financial judgment, or broad unrelated rewrites.
+
+If the user does not specify a level, choose the safest level that still matches their wording. Phrases like "直接帮我操作", "接管", "托管执行", or "按 spec 执行" usually imply L3. Mention L4 only when independent subagent work is truly useful.
+
+Subagent dispatch template:
+
+```markdown
+Subagent task:
+- Objective:
+- Scope:
+- Files/modules owned:
+- Must not touch:
+- Inputs to inspect:
+- Expected output:
+- Verification to run:
+- Return format:
+```
+
+Each subagent brief must be self-contained. Give subagents one narrow domain, name the files or modules they own when editing, and tell them not to revert or overwrite work outside their scope. The main agent must review their output before treating it as true.
+
 Managed Execution output should include:
 
 ```markdown
 ## Execution Contract
-Autonomy level: what the agent may do without asking.
+Autonomy level: L1/L2/L3/L4/L5 and what the agent may do without asking.
 Delegation policy: when to use subagents, how to split ownership, and when not to delegate.
 Pause rules: actions that require user confirmation.
 Verification evidence: commands, screenshots, citations, diffs, or manual checks required before completion.
@@ -97,6 +124,8 @@ False completion:
 - The happy path works but edge cases, errors, loading states, or empty states are untested.
 - The patch solves the example while breaking an existing contract.
 - The agent claims verification without command output or concrete checked behavior.
+- The agent produces a plan but does not execute even though the user asked for execution.
+- Subagent output is accepted without main-agent review and verification.
 
 ### Content Or Copywriting
 
@@ -219,6 +248,7 @@ Assumptions:
 Must include:
 Must avoid:
 Allowed actions:
+Autonomy level:
 Delegation:
 Ask first before:
 Done means:
@@ -313,6 +343,28 @@ False completion: A plan, partial implementation, unreviewed subagent output, or
 Verification: Report changed files, command outputs, runtime checks, source links, screenshots, or acceptance checks that prove the result.
 ```
 
+### Example 5: Subagent Brief
+
+Input:
+```text
+这个任务可以拆给几个子智能体并行做，但不要让他们互相改同一批文件。
+```
+
+Better task direction:
+```markdown
+Delegation policy: Use subagents only for independent modules. Keep the critical path in the main agent. Assign disjoint ownership before dispatch.
+
+Subagent task:
+- Objective: Audit README examples for clarity and missing setup steps.
+- Scope: README.md only.
+- Files/modules owned: README.md.
+- Must not touch: SKILL.md, agents/openai.yaml, repo settings, git history.
+- Inputs to inspect: Current README.md and any local usage examples named in the task.
+- Expected output: A concise list of proposed README edits plus any direct patch if asked.
+- Verification to run: Markdown renders without broken fenced blocks; examples match current skill modes.
+- Return format: Changed files, summary, verification, remaining risks.
+```
+
 ## Quality Check
 
 Before handing off the spec, confirm:
@@ -322,6 +374,7 @@ Before handing off the spec, confirm:
 - Scope boundaries are explicit enough to prevent unwanted edits, claims, or tool use.
 - The autonomy level is explicit enough that the agent can keep moving without asking about every safe action.
 - Delegation is justified by independent work, not by a desire to use more agents.
+- Any subagent brief has objective, scope, owned files, forbidden files, expected output, and verification.
 - Completion cannot be faked by a polished but shallow answer.
 - Verification is independent enough that the user is not relying only on the agent's self-assessment.
 - The final brief is short enough to use and specific enough to constrain action.
